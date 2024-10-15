@@ -1,0 +1,21 @@
+{
+    "name": "yolo-fx/di",
+    "description": "A PHP dependency injection package",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Yolo\\Di\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "LUSHAOMING",
+            "email": "lushaoming6@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {
+        "php": ">=8.0"
+    }
+}
