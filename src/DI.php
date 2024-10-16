@@ -9,8 +9,14 @@ use Yolo\Di\Annotations\Initializer;
 use Yolo\Di\Annotations\Singleton;
 use Yolo\Di\Errors\ParameterTypeEmptyException;
 
+/**
+ * Dependency Injection.
+ */
 class DI
 {
+    /**
+     * @var array $instances The array of singleton instances.
+     */
     private static array $instances = [];
 
     /**
@@ -64,10 +70,14 @@ class DI
                 if ($attribute->getName() === Initializer::class) {
 
                     $instance->{$method->getName()}();
+
+                    // Only one initializer method is allowed.
+                    break 2;
                 }
             }
         }
 
+        // Save instance if class is singleton.
         if (self::isSingleton($reflection->getAttributes())) {
 
             self::$instances[$class] = $instance;
@@ -78,7 +88,7 @@ class DI
 
     /**
      * Check if class is singleton.
-     * @param ReflectionAttribute[] $attributes
+     * @param ReflectionAttribute[] $attributes The array of class attributes.
      * @return bool
      */
     private static function isSingleton(array $attributes): bool

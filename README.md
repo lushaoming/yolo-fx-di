@@ -12,17 +12,17 @@ composer require yolo-fx/di
 
 ## Usage
 
-You can use the `Yolo\DI\DI::use()` to create an instance of the class, like:
+You can use the `Yolo\Di\DI::use()` to create an instance of the class, like:
 
-`Yolo\DI\DI::use(User::class)`
+`Yolo\Di\DI::use(User::class)`
 
-And, you can use the `Yolo\DI\Annotations\Singleton` annotation to mark a class as a singleton.
+And, you can use the `Yolo\Di\Annotations\Singleton` annotation to mark a class as a singleton.
 
-Also, you can use the `Yolo\DI\Annotations\Initializer` annotation to mark a method as an initializer.
+Also, you can use the `Yolo\Di\Annotations\Initializer` annotation to mark a method as an initializer.
 
 ## Example
 
-- Create a class: User.php
+- Create a class: UserTest.php
 ```php
 <?php
 
@@ -30,9 +30,9 @@ namespace DI\Tests;
 
 use Yolo\Di\Annotations\Initializer;
 
-class User
+class UserTest
 {
-    public function __construct(Animal $animal)
+    public function __construct(private AnimalTest $animal)
     {
         echo "you can see me twice." . PHP_EOL;
     }
@@ -40,7 +40,7 @@ class User
     #[Initializer]
     public function init()
     {
-        echo "User.init after constructor" . PHP_EOL;
+        echo "User.init" . PHP_EOL;
     }
 
     /**
@@ -50,12 +50,12 @@ class User
     public function sayHello()
     {
         echo "Hello, I am a user." . PHP_EOL;
+        $this->animal->sayHello();
     }
-
 }
 ```
 
-- Create another class: Animal.php
+- Create another class: AnimalTest.php
 ```php
 <?php
 
@@ -64,16 +64,15 @@ namespace DI\Tests;
 use Yolo\Di\Annotations\Singleton;
 
 #[Singleton]
-class Animal
+class AnimalTest
 {
     public function __construct()
     {
         echo 'you can only see me once' . PHP_EOL;
     }
-    
     public function sayHello()
     {
-        return 'Hello, I am an animal.' . PHP_EOL;
+        echo 'Hello, I am an animal.' . PHP_EOL;
     }
 }
 ```
@@ -82,20 +81,19 @@ class Animal
 ```php
 <?php
 
-use DI\Tests\User;
+use DI\Tests\UserTest;
 use Yolo\Di\DI;
 
-// require autoload
 require_once __DIR__ . '/../vendor/autoload.php';
-require_once __DIR__ . '/User.php';
-require_once __DIR__ . '/Animal.php';
+require_once __DIR__ . '/UserTest.php';
+require_once __DIR__ . '/AnimalTest.php';
 
 $start = microtime(true);
 
-$user1 = DI::use(User::class);
+$user1 = DI::use(UserTest::class);
 $user1->sayHello();
 
-$user2 = DI::use(User::class);
+$user2 = DI::use(UserTest::class);
 $user2->sayHello();
 
 $end = microtime(true);

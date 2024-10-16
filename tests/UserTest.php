@@ -4,9 +4,9 @@ namespace DI\Tests;
 
 use Yolo\Di\Annotations\Initializer;
 
-class User
+class UserTest
 {
-    public function __construct(Animal $animal)
+    public function __construct(private AnimalTest $animal)
     {
         echo "you can see me twice." . PHP_EOL;
     }
@@ -24,6 +24,7 @@ class User
     public function sayHello()
     {
         echo "Hello, I am a user." . PHP_EOL;
+        $this->animal->sayHello();
     }
 
 }
