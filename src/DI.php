@@ -7,6 +7,7 @@ use ReflectionClass;
 use ReflectionException;
 use Yolo\Di\Annotations\Initializer;
 use Yolo\Di\Annotations\Singleton;
+use Yolo\Di\Errors\CircularDependencyException;
 use Yolo\Di\Errors\ParameterTypeEmptyException;
 
 /**
@@ -20,20 +21,45 @@ class DI
     private static array $instances = [];
 
     /**
+     * @var ReflectionClass[] $reflections The cache for reflection objects.
+     */
+    private static array $reflections = [];
+
+    /**
+     * @var array $creatingInstances The stack to track currently creating instances.
+     */
+    private static array $creatingInstances = [];
+
+    /**
+     * @var array $initializers The cache for initializer methods.
+     */
+    private static array $initializers = [];
+
+    /**
      * Get instance of class.
      * @template T of object
      * @param class-string<T> $class
      * @return T
-     * @throws ReflectionException|ParameterTypeEmptyException
+     * @throws ReflectionException|ParameterTypeEmptyException|CircularDependencyException
      */
     public static function use(string $class)
     {
         if (array_key_exists($class, self::$instances)) {
-
             return self::$instances[$class];
         }
 
-        $reflection = new ReflectionClass($class);
+        // Check for circular dependency
+        if (in_array($class, self::$creatingInstances)) {
+            throw new CircularDependencyException("Circular dependency detected for class: $class");
+        }
+
+        self::$creatingInstances[] = $class;
+
+        if (!isset(self::$reflections[$class])) {
+            self::$reflections[$class] = new ReflectionClass($class);
+        }
+
+        $reflection = self::$reflections[$class];
 
         $constructor = $reflection->getConstructor();
 
@@ -62,19 +88,25 @@ class DI
             $instance = $reflection->newInstance();
         }
 
-        $methods = $reflection->getMethods();
-        foreach ($methods as $method) {
+        if (!isset(self::$initializers[$class])) {
+            $methods = $reflection->getMethods();
+            foreach ($methods as $method) {
 
-            foreach ($method->getAttributes() as $attribute) {
+                foreach ($method->getAttributes() as $attribute) {
 
-                if ($attribute->getName() === Initializer::class) {
+                    if ($attribute->getName() === Initializer::class) {
 
-                    $instance->{$method->getName()}();
+                        self::$initializers[$class] = $method->getName();
 
-                    // Only one initializer method is allowed.
-                    break 2;
+                        // Only one initializer method is allowed.
+                        break 2;
+                    }
                 }
             }
+        }
+
+        if (isset(self::$initializers[$class])) {
+            $instance->{self::$initializers[$class]}();
         }
 
         // Save instance if class is singleton.
@@ -82,6 +114,9 @@ class DI
 
             self::$instances[$class] = $instance;
         }
+
+        // Remove the class from the creating instances stack
+        array_pop(self::$creatingInstances);
 
         return $instance;
     }
