@@ -5,6 +5,12 @@ This is a simple and efficient PHP dependency injection package that uses the la
 ## PHP version
 Minimum PHP version support: `8.0`
 
+## Introduction
+- No dependencies, only one method `DI::use()` is provided
+- Support singleton mode
+- Reflection object caching eliminates the need to repeatedly create the same class reflection and improves performance
+- Circular dependency detection, capable of detecting circular dependency problems (including direct and indirect circular dependencies)
+
 ## Installation
 ```
 composer require yolo-fx/di
