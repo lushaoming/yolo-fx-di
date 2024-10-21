@@ -35,6 +35,8 @@ class DI
      */
     private static array $initializers = [];
 
+    private static array $classMappings = [];
+
     /**
      * Get instance of class.
      * @template T of object
@@ -46,6 +48,10 @@ class DI
     {
         if (array_key_exists($class, self::$instances)) {
             return self::$instances[$class];
+        }
+
+        if (array_key_exists($class, self::$classMappings)) {
+            return self::use(self::$classMappings[$class]);
         }
 
         // Check for circular dependency
@@ -119,6 +125,11 @@ class DI
         array_pop(self::$creatingInstances);
 
         return $instance;
+    }
+
+    public static function setMappings(array $mappings): void
+    {
+        self::$classMappings = $mappings;
     }
 
     /**
