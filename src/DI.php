@@ -35,7 +35,15 @@ class DI
      */
     private static array $initializers = [];
 
+    /**
+     * @var array $classMappings The cache for class mappings.
+     */
     private static array $classMappings = [];
+
+    /**
+     * @var array $aliases The cache for aliases.
+     */
+    private static array $aliases = [];
 
     /**
      * Get instance of class.
@@ -48,6 +56,10 @@ class DI
     {
         if (array_key_exists($class, self::$instances)) {
             return self::$instances[$class];
+        }
+
+        if (array_key_exists($class, self::$aliases)) {
+            return self::use(self::$aliases[$class]);
         }
 
         if (array_key_exists($class, self::$classMappings)) {
@@ -127,9 +139,59 @@ class DI
         return $instance;
     }
 
-    public static function setMappings(array $mappings): void
+    /**
+     * Bind an abstract class to a concrete implementation.
+     * @param string $abstract
+     * @param string $concrete
+     * @return void
+     */
+    public static function bind(string $abstract, string $concrete): void
     {
-        self::$classMappings = $mappings;
+        self::$classMappings[$abstract] = $concrete;
+    }
+
+    /**
+     * Unbind a class.
+     * @param string $abstract
+     * @return void
+     */
+    public static function unbind(string $abstract): void
+    {
+        unset(self::$classMappings[$abstract]);
+    }
+
+    /**
+     * Set an instance manually. (It will override any existing instance for that class.)
+     *
+     * It just like to set a singleton class.
+     * @param string $class
+     * @param object $instance
+     * @return void
+     */
+    public static function instance(string $class, object $instance): void
+    {
+        self::$instances[$class] = $instance;
+    }
+
+    /**
+     * Remove an instance.
+     * @param string $class
+     * @return void
+     */
+    public static function forget(string $class): void
+    {
+        unset(self::$instances[$class]);
+    }
+
+    /**
+     * Set an alias for a class.
+     * @param string $class
+     * @param string $alias
+     * @return void
+     */
+    public static function alias(string $class, string $alias): void
+    {
+        self::$aliases[$alias] = $class;
     }
 
     /**

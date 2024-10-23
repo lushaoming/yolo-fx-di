@@ -6,8 +6,10 @@ This is a simple and efficient PHP dependency injection package that uses the la
 Minimum PHP version support: `8.0`
 
 ## Introduction
-- No dependencies, only one method `DI::use()` is provided
+- No dependencies
 - Support singleton mode
+- Support class alias
+- Support class mappings
 - Reflection object caching eliminates the need to repeatedly create the same class reflection and improves performance
 - Circular dependency detection, capable of detecting circular dependency problems (including direct and indirect circular dependencies)
 
@@ -51,18 +53,23 @@ class TestRunner
     }
 }
 ```
-You can you use the `Yolo\Di\DI::setMappings()` to set  class mappings.
+You can you use the `Yolo\Di\DI::bind()` to set class mappings.
 
 ```php
-DI::setMappings([
-    LoggerInterface::class => ConsoleLogger::class,
-]);
+DI::bind(LoggerInterface::class, ConsoleLogger::class);
 ```
 So the `LoggerInterface::class` will be replaced by `ConsoleLogger::class`.
 
 Now, you can use the `Yolo\Di\DI::use()` to create an instance of the class.
 ```php
 $runner = DI::use(TestRunner::class);
+$runner->sayHello();
+```
+
+- Use class alias
+```php
+DI::alias(TestRunner::class, 'runner');
+$runner = DI::use('runner');
 $runner->sayHello();
 ```
 
@@ -127,24 +134,44 @@ class AnimalTest
 ```php
 <?php
 
-use DI\Tests\UserTest;
 use Yolo\Di\DI;
 
 require_once __DIR__ . '/../vendor/autoload.php';
-require_once __DIR__ . '/UserTest.php';
-require_once __DIR__ . '/AnimalTest.php';
+require_once __DIR__ . '/LoggerInterface.php';
+require_once __DIR__ . '/ConsoleLogger.php';
+require_once __DIR__ . '/FileLogger.php';
+
+class TestRunner
+{
+    public function __construct(private LoggerInterface $logger)
+    {
+    }
+
+    public function sayHello(): void
+    {
+        $this->logger->log("Hello World");
+    }
+}
 
 $start = microtime(true);
 
-$user1 = DI::use(UserTest::class);
-$user1->sayHello();
+DI::bind(LoggerInterface::class, ConsoleLogger::class);
 
-$user2 = DI::use(UserTest::class);
-$user2->sayHello();
+// Use DI::alias to create an alias for a class
+DI::alias(TestRunner::class, 'runner');
+// And then use the alias to create an instance of TestRunner
+$runner = DI::use('runner');
+$runner->sayHello();
+
+// Also, you can use the class name to create an instance of TestRunner
+$runner = DI::use(TestRunner::class);
+$runner->sayHello();
 
 $end = microtime(true);
 
-echo 'Spent ' . round(($end - $start) * 6, 3) . 'ms';
+echo 'Spent ' . round(($end - $start) * 6, 3) . 'ms' . PHP_EOL;
+
+echo 'Memory usage: ' . round(memory_get_usage() / 1024, 3) . 'kb' . PHP_EOL;
 ```
 
 ## Notes
