@@ -54,51 +54,28 @@ class DI
      */
     public static function use(string $class)
     {
-        if (array_key_exists($class, self::$instances)) {
-            return self::$instances[$class];
-        }
+        // Resolve class if it's an alias.
+        $resolvedClass = self::resolveClass($class);
 
-        if (array_key_exists($class, self::$aliases)) {
-            return self::use(self::$aliases[$class]);
-        }
-
-        if (array_key_exists($class, self::$classMappings)) {
-            return self::use(self::$classMappings[$class]);
+        if (array_key_exists($resolvedClass, self::$instances)) {
+            return self::$instances[$resolvedClass];
         }
 
         // Check for circular dependency
-        if (in_array($class, self::$creatingInstances)) {
+        if (in_array($resolvedClass, self::$creatingInstances)) {
             throw new CircularDependencyException("Circular dependency detected for class: $class");
         }
 
-        self::$creatingInstances[] = $class;
+        self::$creatingInstances[] = $resolvedClass;
 
-        if (!isset(self::$reflections[$class])) {
-            self::$reflections[$class] = new ReflectionClass($class);
+        if (!isset(self::$reflections[$resolvedClass])) {
+            self::$reflections[$resolvedClass] = new ReflectionClass($resolvedClass);
         }
 
-        $reflection = self::$reflections[$class];
+        $reflection = self::$reflections[$resolvedClass];
 
-        $constructor = $reflection->getConstructor();
-
-        if ($constructor) {
-
-            $parameters = $constructor->getParameters();
-
-            $constructorParameters = [];
-
-            foreach ($parameters as $parameter) {
-
-                $name = $parameter->getName();
-                $type = $parameter->getType();
-
-                if (!$type) {
-
-                    throw new ParameterTypeEmptyException("Parameter type not found: $name");
-                }
-
-                $constructorParameters[] = self::use($type);
-            }
+        $constructorParameters = self::resolveConstructorParameters($reflection);
+        if ($constructorParameters) {
 
             $instance = $reflection->newInstanceArgs($constructorParameters);
         } else {
@@ -106,37 +83,84 @@ class DI
             $instance = $reflection->newInstance();
         }
 
-        if (!isset(self::$initializers[$class])) {
-            $methods = $reflection->getMethods();
-            foreach ($methods as $method) {
+        if (!isset(self::$initializers[$resolvedClass])) {
 
-                foreach ($method->getAttributes() as $attribute) {
-
-                    if ($attribute->getName() === Initializer::class) {
-
-                        self::$initializers[$class] = $method->getName();
-
-                        // Only one initializer method is allowed.
-                        break 2;
-                    }
-                }
+            $initializerMethod = self::findInitializerMethod($reflection);
+            if ($initializerMethod) {
+                self::$initializers[$resolvedClass] = $initializerMethod;
             }
         }
 
-        if (isset(self::$initializers[$class])) {
-            $instance->{self::$initializers[$class]}();
+        if (isset(self::$initializers[$resolvedClass])) {
+            $instance->{self::$initializers[$resolvedClass]}();
         }
 
         // Save instance if class is singleton.
         if (self::isSingleton($reflection->getAttributes())) {
 
-            self::$instances[$class] = $instance;
+            self::$instances[$resolvedClass] = $instance;
         }
 
         // Remove the class from the creating instances stack
         array_pop(self::$creatingInstances);
 
         return $instance;
+    }
+
+    /**
+     * Resolve class name.
+     * @param string $class
+     * @return string
+     */
+    private static function resolveClass(string $class): string
+    {
+        if (isset(self::$aliases[$class])) {
+            return self::resolveClass(self::$aliases[$class]);
+        }
+        if (isset(self::$classMappings[$class])) {
+            return self::resolveClass(self::$classMappings[$class]);
+        }
+        return $class;
+    }
+
+    /**
+     * Resolve constructor parameters.
+     * @param ReflectionClass $reflection
+     * @return array
+     * @throws CircularDependencyException
+     * @throws ParameterTypeEmptyException
+     * @throws ReflectionException
+     */
+    private static function resolveConstructorParameters(ReflectionClass $reflection): array
+    {
+        $parameters = [];
+        $constructor = $reflection->getConstructor();
+        if ($constructor) {
+            foreach ($constructor->getParameters() as $parameter) {
+                $type = $parameter->getType();
+                if (!$type) {
+                    throw new ParameterTypeEmptyException("Parameter type not found: " . $parameter->getName());
+                }
+                $parameters[] = self::use($type->getName());
+            }
+        }
+
+        return $parameters;
+    }
+
+    /**
+     * Find initializer method.
+     * @param ReflectionClass $reflection
+     * @return string|null
+     */
+    private static function findInitializerMethod(ReflectionClass $reflection): ?string
+    {
+        foreach ($reflection->getMethods() as $method) {
+            foreach ($method->getAttributes(Initializer::class) as $attribute) {
+                return $method->getName();
+            }
+        }
+        return null;
     }
 
     /**
