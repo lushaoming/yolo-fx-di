@@ -46,6 +46,11 @@ class DI
     private static array $aliases = [];
 
     /**
+     * @var array $classes The cache for classes.
+     */
+    private static array $classes = [];
+
+    /**
      * Get instance of class.
      * @template T of object
      * @param class-string<T> $class
@@ -68,11 +73,7 @@ class DI
 
         self::$creatingInstances[] = $resolvedClass;
 
-        if (!isset(self::$reflections[$resolvedClass])) {
-            self::$reflections[$resolvedClass] = new ReflectionClass($resolvedClass);
-        }
-
-        $reflection = self::$reflections[$resolvedClass];
+        $reflection = self::resolveReflection($resolvedClass);
 
         $constructorParameters = self::resolveConstructorParameters($reflection);
         if ($constructorParameters) {
@@ -96,7 +97,7 @@ class DI
         }
 
         // Save instance if class is singleton.
-        if (self::isSingleton($reflection->getAttributes())) {
+        if (self::isSingleton($reflection->getAttributes(Singleton::class))) {
 
             self::$instances[$resolvedClass] = $instance;
         }
@@ -105,6 +106,31 @@ class DI
         array_pop(self::$creatingInstances);
 
         return $instance;
+    }
+
+    /**
+     * Resolve class reflection.
+     * @param string $class
+     * @return ReflectionClass
+     * @throws ReflectionException
+     */
+    private static function resolveReflection(string $class): ReflectionClass
+    {
+        if (!isset(self::$reflections[$class])) {
+
+            self::$reflections[$class] = new ReflectionClass($class);
+            self::$classes[] = $class;
+
+            // Limit the number of reflections to prevent memory leaks
+            if (count(self::$classes) > 100) {
+
+                // Remove the first class from the classes array and unset its reflection
+                $removedClass = array_shift(self::$classes);
+                unset(self::$reflections[$removedClass]);
+            }
+        }
+
+        return self::$reflections[$class];
     }
 
     /**
@@ -156,7 +182,7 @@ class DI
     private static function findInitializerMethod(ReflectionClass $reflection): ?string
     {
         foreach ($reflection->getMethods() as $method) {
-            foreach ($method->getAttributes(Initializer::class) as $attribute) {
+            foreach ($method->getAttributes(Initializer::class) as $ignored) {
                 return $method->getName();
             }
         }
