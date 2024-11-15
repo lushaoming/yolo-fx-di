@@ -10,6 +10,12 @@ Minimum PHP version support: `8.0`
 - Support singleton mode
 - Support class alias
 - Support class mappings
+- Support initializer method
+  > Different from the constructor method of the class, it will be executed after the constructor method is executed (if any)
+
+- Support custom property injection
+  > Implement `PropertyAttributeInterface`
+
 - Reflection object caching eliminates the need to repeatedly create the same class reflection and improves performance
 - Circular dependency detection, capable of detecting circular dependency problems (including direct and indirect circular dependencies)
 
@@ -33,6 +39,57 @@ You can use the `Yolo\Di\Annotations\Singleton` annotation to mark a class as a 
 - Initializer
 
 You can use the `Yolo\Di\Annotations\Initializer` annotation to mark a method as an initializer.
+
+- Custom property injection 
+
+Define a custom property injection attribute class that implements `PropertyAttributeInterface`.
+
+```php
+<?php
+
+use Yolo\Di\DI;
+use Yolo\Di\PropertyAttributeInterface;
+
+#[Attribute]
+class Cache implements PropertyAttributeInterface
+{
+    public function __construct(
+        private string $driver = 'default'
+    ){}
+
+    public function inject(): mixed
+    {
+        return match ($this->driver) {
+            'file' => DI::use(FileLogger::class),
+            default => DI::use(ConsoleLogger::class),
+        };
+    }
+}
+```
+Add the custom property injection attribute class to DI.
+```php
+DI::addCustomPropertyAttribute(Cache::class);
+```
+
+And now, you can use the `Cache` attribute in your class.
+
+```php
+class  TestRunner
+{
+    public function __construct(
+        #[Cache('file')]
+        private LoggerInterface $logger
+    ){
+    }
+
+    public function sayHello(): void
+    {
+        $this->logger->log("Hello World");
+    }
+}
+```
+
+So the `$logger` is a `FileLogger` instance.
 
 - Use class Mappings
 
@@ -65,6 +122,9 @@ Now, you can use the `Yolo\Di\DI::use()` to create an instance of the class.
 $runner = DI::use(TestRunner::class);
 $runner->sayHello();
 ```
+
+> `DI::bind()` will affect the global class mapping. If you only want this effect on a certain instance, please use custom property attribute injection.
+
 
 - Use class alias
 ```php

@@ -8,6 +8,7 @@ use ReflectionException;
 use Yolo\Di\Annotations\Initializer;
 use Yolo\Di\Annotations\Singleton;
 use Yolo\Di\Errors\CircularDependencyException;
+use Yolo\Di\Errors\InvalidAttributeException;
 use Yolo\Di\Errors\ParameterTypeEmptyException;
 
 /**
@@ -51,11 +52,16 @@ class DI
     private static array $classes = [];
 
     /**
+     * @var array $customPropertyAttributes The cache for custom property attributes.
+     */
+    private static array $customPropertyAttributes = [];
+
+    /**
      * Get instance of class.
      * @template T of object
      * @param class-string<T> $class
      * @return T
-     * @throws ReflectionException|ParameterTypeEmptyException|CircularDependencyException
+     * @throws ReflectionException|ParameterTypeEmptyException|CircularDependencyException|InvalidAttributeException
      */
     public static function use(string $class)
     {
@@ -100,6 +106,17 @@ class DI
         if (self::isSingleton($reflection->getAttributes(Singleton::class))) {
 
             self::$instances[$resolvedClass] = $instance;
+        } else {
+
+            self::$reflections[$class] = $reflection;
+
+            // Limit the number of reflections to prevent memory leaks
+            if (count(self::$classes) > 100) {
+
+                // Remove the first class from the classes array and unset its reflection
+                $removedClass = array_shift(self::$classes);
+                unset(self::$reflections[$removedClass]);
+            }
         }
 
         // Remove the class from the creating instances stack
@@ -116,21 +133,13 @@ class DI
      */
     private static function resolveReflection(string $class): ReflectionClass
     {
-        if (!isset(self::$reflections[$class])) {
+        if (isset(self::$reflections[$class])) {
 
-            self::$reflections[$class] = new ReflectionClass($class);
-            self::$classes[] = $class;
-
-            // Limit the number of reflections to prevent memory leaks
-            if (count(self::$classes) > 100) {
-
-                // Remove the first class from the classes array and unset its reflection
-                $removedClass = array_shift(self::$classes);
-                unset(self::$reflections[$removedClass]);
-            }
+            return self::$reflections[$class];
         }
 
-        return self::$reflections[$class];
+        self::$classes[] = $class;
+        return new ReflectionClass($class);
     }
 
     /**
@@ -143,6 +152,7 @@ class DI
         if (isset(self::$aliases[$class])) {
             return self::resolveClass(self::$aliases[$class]);
         }
+
         if (isset(self::$classMappings[$class])) {
             return self::resolveClass(self::$classMappings[$class]);
         }
@@ -155,7 +165,7 @@ class DI
      * @return array
      * @throws CircularDependencyException
      * @throws ParameterTypeEmptyException
-     * @throws ReflectionException
+     * @throws ReflectionException|InvalidAttributeException
      */
     private static function resolveConstructorParameters(ReflectionClass $reflection): array
     {
@@ -163,10 +173,22 @@ class DI
         $constructor = $reflection->getConstructor();
         if ($constructor) {
             foreach ($constructor->getParameters() as $parameter) {
+
                 $type = $parameter->getType();
                 if (!$type) {
                     throw new ParameterTypeEmptyException("Parameter type not found: " . $parameter->getName());
                 }
+
+                foreach ($parameter->getAttributes() as $attribute) {
+
+                    // Handle custom property attributes
+                    if (in_array($attribute->getName(), self::$customPropertyAttributes)) {
+
+                        $parameters[] = self::injectCustomPropertyAttributes($type, $attribute);
+                        continue 2;
+                    }
+                }
+
                 $parameters[] = self::use($type->getName());
             }
         }
@@ -260,5 +282,46 @@ class DI
         }
 
         return false;
+    }
+
+    /**
+     * Add a custom property attribute.
+     * @param $class
+     * @return void
+     */
+    public static function addCustomPropertyAttribute($class): void
+    {
+        if (in_array($class, self::$customPropertyAttributes)) {
+            return;
+        }
+
+        self::$customPropertyAttributes[] = $class;
+    }
+
+    /**
+     * Inject a custom property attribute.
+     * @param $type
+     * @param ReflectionAttribute $attribute
+     * @return mixed
+     * @throws InvalidAttributeException
+     */
+    private static function injectCustomPropertyAttributes($type, ReflectionAttribute $attribute): mixed
+    {
+        $instance = $attribute->newInstance();
+
+        // Handle custom property attributes
+        if ($instance instanceof PropertyAttributeInterface) {
+
+            $injected = $instance->inject();
+
+            $propertyType = $type->getName();
+            if ($injected instanceof $propertyType) {
+                return $injected;
+            }
+
+            throw new InvalidAttributeException($attribute->getName() . ' must return an instance of ' . $propertyType);
+        }
+
+        throw new InvalidAttributeException('Invalid property attribute: ' . $attribute->getName());
     }
 }
