@@ -108,6 +108,7 @@ class DI
             self::$instances[$resolvedClass] = $instance;
         } else {
 
+            self::$classes[] = $class;
             self::$reflections[$class] = $reflection;
 
             // Limit the number of reflections to prevent memory leaks
@@ -138,7 +139,6 @@ class DI
             return self::$reflections[$class];
         }
 
-        self::$classes[] = $class;
         return new ReflectionClass($class);
     }
 
