@@ -59,11 +59,12 @@ class DI
     /**
      * Get instance of class.
      * @template T of object
-     * @param class-string<T> $class
+     * @param class-string<T> $class Class name
+     * @param bool $cache Whether to cache the reflection or not.
      * @return T
      * @throws ReflectionException|ParameterTypeEmptyException|CircularDependencyException|InvalidAttributeException
      */
-    public static function use(string $class)
+    public static function use(string $class, bool $cache = true)
     {
         // Resolve class if it's an alias.
         $resolvedClass = self::resolveClass($class);
@@ -106,7 +107,7 @@ class DI
         if (self::isSingleton($reflection->getAttributes(Singleton::class))) {
 
             self::$instances[$resolvedClass] = $instance;
-        } else {
+        } elseif ($cache) {
 
             self::$classes[] = $class;
             self::$reflections[$class] = $reflection;
