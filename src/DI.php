@@ -185,7 +185,7 @@ class DI
                     // Handle custom property attributes
                     if (in_array($attribute->getName(), self::$customPropertyAttributes)) {
 
-                        $parameters[] = self::injectCustomPropertyAttributes($type, $attribute);
+                        $parameters[] = self::injectCustomPropertyAttributes($attribute);
                         continue 2;
                     }
                 }
@@ -306,21 +306,14 @@ class DI
      * @return mixed
      * @throws InvalidAttributeException
      */
-    private static function injectCustomPropertyAttributes($type, ReflectionAttribute $attribute): mixed
+    private static function injectCustomPropertyAttributes(ReflectionAttribute $attribute): mixed
     {
         $instance = $attribute->newInstance();
 
         // Handle custom property attributes
         if ($instance instanceof PropertyAttributeInterface) {
 
-            $injected = $instance->inject();
-
-            $propertyType = $type->getName();
-            if ($injected instanceof $propertyType) {
-                return $injected;
-            }
-
-            throw new InvalidAttributeException($attribute->getName() . ' must return an instance of ' . $propertyType);
+            return $instance->inject();
         }
 
         throw new InvalidAttributeException('Invalid property attribute: ' . $attribute->getName());
