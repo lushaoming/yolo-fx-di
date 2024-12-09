@@ -66,6 +66,27 @@ class DI
      */
     public static function use(string $class, bool $cache = true)
     {
+        try {
+
+            return self::resolveDI($class, $cache);
+
+        } finally {
+
+            array_pop(self::$creatingInstances);
+        }
+
+    }
+
+    /**
+     * Get instance of class.
+     * @template T of object
+     * @param class-string<T> $class Class name
+     * @param bool $cache Whether to cache the reflection or not.
+     * @return T
+     * @throws ReflectionException|ParameterTypeEmptyException|CircularDependencyException|InvalidAttributeException
+     */
+    private static function resolveDI(string $class, bool $cache = true)
+    {
         // Resolve class if it's an alias.
         $resolvedClass = self::resolveClass($class);
 
@@ -120,9 +141,6 @@ class DI
                 unset(self::$reflections[$removedClass]);
             }
         }
-
-        // Remove the class from the creating instances stack
-        array_pop(self::$creatingInstances);
 
         return $instance;
     }
